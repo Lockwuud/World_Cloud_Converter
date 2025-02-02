@@ -23,7 +23,6 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   quadrotor_msgs
   message_generation
-  rog_map
 )
 
 find_package(OpenCV REQUIRED)
@@ -64,25 +63,23 @@ set(THIRD_PARTY
 ## Add definitions for PCL
 add_definitions(${PCL_DEFINITIONS})
 
-add_library(kdtree
-        include/utils/kdtree.c
-)
-
-## Declare a C++ executable and add source files
+## 时间软同步
 add_executable(${PROJECT_NAME}_node
   src/cloud_converter.cpp
 )
-
-## Link the executable with catkin libraries and PCL
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${PCL_LIBRARIES}  # 链接 PCL 的库
 )
 
-add_executable(map_node
-        src/map_node.cpp
-)
-target_link_libraries(map_node
-        ${THIRD_PARTY}
-)
+# ## 队列同步
+# add_executable(cloud_process_node
+#   src/cloud_process.cpp
+# )
+# target_link_libraries(cloud_process_node
+#   ${catkin_LIBRARIES}
+#   ${OpenCV_LIBRARIES}
+#   ${PCL_LIBRARIES}  # 链接 PCL 的库
+# )
+

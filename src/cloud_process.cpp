@@ -1,13 +1,15 @@
 /*
  * @Author: hejia 2736463842@qq.com
- * @Date: 2025-01-19 22:39:05
+ * @Date: 2025-02-02 19:39:52
  * @LastEditors: hejia 2736463842@qq.com
- * @LastEditTime: 2025-02-02 22:09:34
- * @FilePath: /ego-planner-swarm/src/World_Cloud_Converter/src/cloud_converter.cpp
- * @Description: Convert PointCloud coordinates using TF
+ * @LastEditTime: 2025-02-02 21:10:36
+ * @FilePath: /ego-planner-swarm/src/World_Cloud_Converter/src/cloud_process.cpp
+ * @Description: 
+ * 
+ * Copyright (c) 2025 by hejia 2736463842@qq.com, All Rights Reserved. 
  */
-
 #include <thread>
+#include <vector>
 
 #include <ros/ros.h>
 #include <tf2_ros/transform_listener.h>
@@ -41,13 +43,97 @@
 #define ed_resolution 0.2
 #define quarter_pi 0.785398163397f
 #define three_quarters_pi 2.356194490191f
-#define half_length 0.257525f
+#define half_length 257.525f
+
+#define thread_nums 4
+
+using namespace message_filters;
 
 tf2_ros::Buffer buffer;
 ros::Publisher pub;
 pcl::PointCloud<pcl::PointXYZ> edgeCloud;
+std::vector<sensor_msgs::PointCloud> queueCloud_f;
+std::vector<sensor_msgs::PointCloud> queueCloud_r;
 
-using namespace message_filters;
+class ThreadPool
+{
+private:
+    // 线程池中的工作线程函数
+    void workerLoop();
+
+    std::vector<std::thread> workers;        // 线程池中的所有线程
+    std::queue<std::function<void()>> tasks; // 任务队列，存储待处理的任务
+    std::mutex queueMutex;                   // 互斥锁，用于保护任务队列
+    std::condition_variable condVar;         // 条件变量，用于通知线程执行任务
+    std::atomic<bool> stop;                  // 原子变量，用于控制线程池的停止
+
+public:
+    ThreadPool(size_t numThreads);
+
+    ~ThreadPool();
+
+    void enqueue(std::function<void()> task);
+};
+
+/**
+ * @description: 构造函数，初始化线程池
+ * @param {size_t} numThreads
+ * @return {*}
+ */
+ThreadPool::ThreadPool(size_t numThreads) : stop(false) {
+    for (size_t i = 0; i < numThreads; ++i) {
+        workers.push_back(std::thread([this]() { workerLoop(); }));
+    }
+}
+
+/**
+ * @description: 析构函数，停止线程池中的所有线程
+ * @return {*}
+ */
+ThreadPool::~ThreadPool() {
+    stop = true;         
+    condVar.notify_all();  
+    for (std::thread &worker : workers) {
+        worker.join();     
+    }
+}
+
+/**
+ * @description: 向线程池队列中添加一个任务
+ * @param {function<void()>} task
+ * @return {*}
+ */
+void ThreadPool::enqueue(std::function<void()> task) {
+    {
+        std::lock_guard<std::mutex> lock(queueMutex); 
+        tasks.push(task);  
+    }
+    condVar.notify_one();
+}
+
+/**
+ * @description: 线程池工作循环
+ * @return {*}
+ */
+void ThreadPool::workerLoop() {
+    while (!stop) 
+    { 
+        std::function<void()> task;  
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            condVar.wait(lock, [this]() { return stop || !tasks.empty(); });  // 等待任务或停止信号
+
+            if (stop && tasks.empty()) {
+                return;
+            }
+
+            task = tasks.front();
+            tasks.pop(); 
+        }
+
+        task();
+    }
+}
 
 pcl::PointCloud<pcl::PointXYZ> generateRectanglePointCloud(float edge_left, float edge_right, float edge_floor, float edge_ceil, float resolution)
 {
@@ -86,7 +172,17 @@ pcl::PointCloud<pcl::PointXYZ> generateRectanglePointCloud(float edge_left, floa
     return cloud;
 }
 
-void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs::PointCloud::ConstPtr &msg_r)
+void cloud_front_cbk(const sensor_msgs::PointCloud2::ConstPtr& msg)
+{
+    queueCloud_f.push_bcak(msg);
+}
+
+void cloud_rear_cbk(const sensor_msgs::PointCloud2::ConstPtr& msg)
+{
+    queueCloud_r.push_back(msg);
+}
+
+void cloud_cbk(const sensor_msgs::PointCloud msg_f, const sensor_msgs::PointCloud msg_r)
 {
     sensor_msgs::PointCloud2 cloud;
     pcl::PointCloud<pcl::PointXYZ> pclCloud;
@@ -133,7 +229,7 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                     pclCloud.points[i].y = std::nanf("");
                     pclCloud.points[i].z = std::nanf("");
                     continue;
-                }               
+                }
             } });
 
         std::thread THREAD_PROCESS_REAR([&]
@@ -190,6 +286,7 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
 
 int main(int argc, char *argv[])
 {
+    ThreadPool threadPool(4);
     ros::init(argc, argv, "cloud_converter");
     ros::NodeHandle nh;
     tf2_ros::TransformListener listener(buffer);
@@ -197,18 +294,33 @@ int main(int argc, char *argv[])
 
     // Subscriber and Publisher
     pub = nh.advertise<sensor_msgs::PointCloud2>("/cloud_transformed", 10);
-    message_filters::Subscriber<sensor_msgs::PointCloud> front_sub(nh, "/cloud_front", 1);
-    message_filters::Subscriber<sensor_msgs::PointCloud> rear_sub(nh, "/cloud_rear", 1);
+    ros::Subscriber sub_front = nh.subscribe("/cloud_front", 1, cloud_front_cbk);
+    ros::Subscriber sub_rear = nh.subscribe("/cloud_rear", 1, cloud_rear_cbk);
+ 
+    // Queue Sync
+    std::thread THREAD_CLOUD_SYNC([&]{
+        if(!queueCloud_f.empty() && !queueCloud_r.empty())
+        {
+            if(queueCloud_r.size() < 2){
+                sensor_msgs::PointCloud2 msg_f = queueCloud_f.front();
+                sensor_msgs::PointCloud2 msg_r = queueCloud_r.front();
+            }
+            else{
+                while(queueCloud_r.size() >= 2)
+                {
+                    sensor_msgs::PointCloud2 msg_r_next = queueCloud_r[queueCloud_r.begin
+                ()+1];
+                }
+            }
+            
 
-    // Time Sync
-    typedef sync_policies::ApproximateTime<sensor_msgs::PointCloud, sensor_msgs::PointCloud> MySyncPolicy;
-    Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), front_sub, rear_sub); // queue size=10
-    sync.registerCallback(boost::bind(&cloud_cbk, _1, _2));
+        }
+    });
 
-    // Asynchronous Callback
-    ros::AsyncSpinner spinner(2);
-    spinner.start();
-    ros::waitForShutdown();
+    // MultiThreaded Spinner
+    ros::MultiThreadedSpinner spinner(2);
+    spinner.spin();
 
+    THREAD_CLOUD_SYNC.join();
     return 0;
 }
