@@ -85,7 +85,7 @@ void cloudFilter(pcl::PointXYZ* d_points, int num_points, float dx, float dy, fl
     float x_local_angled = d_points[idx].x * cos(dyaw) - d_points[idx].y * sin(dyaw);
     float y_local_angled = d_points[idx].x * sin(dyaw) + d_points[idx].y * cos(dyaw);
 
-    if ((fabsf(x_local_angled) < half_height && fabsf(y_local_angled) < half_width) || d_points[idx].z > max_z || d_points[idx].z < min_z)
+    if ((fabsf(x_local_angled) < half_height && fabsf(y_local_angled) < half_width) || d_points[idx].z < min_z || d_points[idx].z > max_z)
     {
         d_points[idx].x = std::nanf("");
         d_points[idx].y = std::nanf("");
@@ -107,7 +107,7 @@ void cloudFilter(pcl::PointXYZ* d_points, int num_points, float dx, float dy, fl
 }
 
 void cloud_cbk(const sensor_msgs::PointCloud2 msg)
-{
+{  
     sensor_msgs::PointCloud2 cloud;
     pcl::PointCloud<pcl::PointXYZ> lidarCloud;
     pcl::PointCloud<pcl::PointXYZ> pclCloud;
@@ -141,6 +141,15 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
             int numBlocks = (num_points + blockSize - 1) / blockSize;
             cloudFilter<<<numBlocks, blockSize>>>(d_points, num_points, dx, dy, dyaw, self_half_height, self_half_width, ed_floor, ed_ceil, ed_left, ed_right, passthrough_z_max, passthrough_z_min);
 
+            printf("half_height:%f\n", self_half_height);
+            printf("half_width:%f\n", self_half_width);
+            printf("floor:%f\n", ed_floor);
+            printf("ceil:%f\n", ed_ceil);
+            printf("left:%f\n", ed_left);   
+            printf("right:%f\n", ed_right);
+            printf("max_z:%f\n", passthrough_z_max); 
+            printf("min_z:%f\n", passthrough_z_min); 
+
             cudaMemcpy(pclCloud.points.data(), d_points, num_points * sizeof(pcl::PointXYZ), cudaMemcpyDeviceToHost);
             cudaFree(d_points);
         });
@@ -169,7 +178,7 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "cloud_converter");
-    ros::NodeHandle nh;
+    ros::NodeHandle nh("~");
     tf2_ros::TransformListener listener(buffer);
 
     ros::param::get("ed_left", ed_left);
