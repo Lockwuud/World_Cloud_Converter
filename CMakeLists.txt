@@ -37,6 +37,7 @@ find_package(PCL REQUIRED)
 ## catkin specific configuration ##
 ###################################
 catkin_package(
+  INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp rospy std_msgs message_runtime tf2 tf2_ros tf2_geometry_msgs
 )
 
@@ -49,6 +50,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
   SYSTEM
+  include
   ../../../../devel/include
   ${catkin_INCLUDE_DIRS}
   ${Eigen3_INCLUDE_DIRS}
