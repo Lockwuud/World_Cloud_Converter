@@ -33,15 +33,17 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/sync_policies/exact_time.h>
 
-#define self_range 0.35
-#define ed_left 4.62524
-#define ed_right -0.32476
-#define ed_ceil 7.63428
-#define ed_floor -0.36572
-#define ed_resolution 0.2
+#define self_w 0.3155f
+#define self_h 0.3055f
+#define ed_left 3.6845f
+#define ed_right -0.3155f
+#define ed_ceil 14.6945f
+#define ed_floor -0.3055f
+#define ed_resolution 0.2f
 #define quarter_pi 0.785398163397f
 #define three_quarters_pi 2.356194490191f
 #define half_length 0.257525f
+
 
 tf2_ros::Buffer buffer;
 ros::Publisher pub;
@@ -115,7 +117,10 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                 float x_local_angled = msg_f->points[i].x * cos(dyaw_) - msg_f->points[i].y * sin(dyaw_);
                 float y_local_angled = msg_f->points[i].x * sin(dyaw_) + msg_f->points[i].y * cos(dyaw_);
 
-                if (x_local_angled < 0 && y_local_angled > 0)
+                pclCloud.points[i].x = x_local_angled + half_length;
+                pclCloud.points[i].y = y_local_angled - half_length;
+
+                if (fabs(pclCloud.points[i].x) <= self_h && fabs(pclCloud.points[i].y) <= self_w)
                 {
                     pclCloud.points[i].x = std::nanf("");
                     pclCloud.points[i].y = std::nanf("");
@@ -123,8 +128,8 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                     continue;
                 }
 
-                pclCloud.points[i].x = x_local_angled + half_length + dx;
-                pclCloud.points[i].y = y_local_angled - half_length + dy;
+                pclCloud.points[i].x += dx;
+                pclCloud.points[i].y += dy;
                 pclCloud.points[i].z = 0.0;
 
                 if (pclCloud.points[i].x <= ed_floor || pclCloud.points[i].x >= ed_ceil || pclCloud.points[i].y <= ed_right || pclCloud.points[i].y >= ed_left)
@@ -145,7 +150,7 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                 float x_local_angled = msg_r->points[i].x * cos(dyaw_) - msg_r->points[i].y * sin(dyaw_);
                 float y_local_angled = msg_r->points[i].x * sin(dyaw_) + msg_r->points[i].y * cos(dyaw_);
 
-                if (x_local_angled > 0 && y_local_angled < 0)
+                if(x_local_angled >= -0.3 && y_local_angled <= 0.2)
                 {
                     pclCloud.points[j].x = std::nanf("");
                     pclCloud.points[j].y = std::nanf("");
@@ -153,8 +158,19 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                     continue;
                 }
 
-                pclCloud.points[j].x = x_local_angled - half_length + dx;
-                pclCloud.points[j].y = y_local_angled + half_length + dy;
+                pclCloud.points[j].x = x_local_angled - half_length;
+                pclCloud.points[j].y = y_local_angled + half_length;
+
+                if (pclCloud.points[i].x <= self_h && fabs(pclCloud.points[i].y) <= self_w)
+                {
+                    pclCloud.points[j].x = std::nanf("");
+                    pclCloud.points[j].y = std::nanf("");
+                    pclCloud.points[j].z = std::nanf("");
+                    continue;
+                }
+
+                pclCloud.points[j].x += dx;
+                pclCloud.points[j].y += dy;
                 pclCloud.points[j].z = 0.0;
 
                 if (pclCloud.points[j].x <= ed_floor || pclCloud.points[j].x >= ed_ceil || pclCloud.points[j].y <= ed_right || pclCloud.points[j].y >= ed_left)

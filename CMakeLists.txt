@@ -8,6 +8,9 @@ set(CMAKE_CXX_FLAGS "-O3 -Wall -g -fPIC")
 add_compile_options(-DQT_NO_VERSION_TAGGING)
 add_compile_options(-Werror=unused-variable)
 add_compile_options(-Werror=return-type)
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -DMY_DEF=1")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMY_DEF=1" )
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DMY_DEF=1" )
 
 add_definitions(-DORIGIN_AT_CORNER)
 
@@ -25,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
+find_package(CUDA REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
@@ -33,7 +37,6 @@ find_package(PCL REQUIRED)
 ## catkin specific configuration ##
 ###################################
 catkin_package(
-  INCLUDE_DIRS include
   CATKIN_DEPENDS roscpp rospy std_msgs message_runtime tf2 tf2_ros tf2_geometry_msgs
 )
 
@@ -46,12 +49,12 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
   SYSTEM
-  include
   ../../../../devel/include
   ${catkin_INCLUDE_DIRS}
   ${Eigen3_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
-  ${PCL_INCLUDE_DIRS}  # 添加 PCL 的 include 路径
+  ${PCL_INCLUDE_DIRS} 
+  ${CUDA_INCLUDE_DIRS} 
 )
 
 set(THIRD_PARTY
@@ -73,13 +76,12 @@ target_link_libraries(${PROJECT_NAME}_node
   ${PCL_LIBRARIES}  # 链接 PCL 的库
 )
 
-# ## 队列同步
-# add_executable(cloud_process_node
-#   src/cloud_process.cpp
-# )
-# target_link_libraries(cloud_process_node
-#   ${catkin_LIBRARIES}
-#   ${OpenCV_LIBRARIES}
-#   ${PCL_LIBRARIES}  # 链接 PCL 的库
-# )
+## 时间软同步——CUDA并行
+cuda_add_executable(cloud_converter_cuda_node src/cloud_converter_cuda.cu)
+target_link_libraries(cloud_converter_cuda_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES}  
+  ${CUDA_LIBRARIES}
+)
 

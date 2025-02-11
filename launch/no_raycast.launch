@@ -1,7 +1,0 @@
-<launch>
-    <node name="map_node" pkg="world_cloud_converter" type="map_node" output="screen">
-<!--        remember to load the parameters like here!!-->
-        <rosparam command="load" file="$(find world_cloud_converter)/config/no_raycast.yaml"/>
-    </node>
-
-</launch>
