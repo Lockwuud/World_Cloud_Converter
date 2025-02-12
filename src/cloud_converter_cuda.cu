@@ -37,6 +37,7 @@
 
 #include <cuda_runtime.h>
 
+#include "tictoc.hpp"
 
 tf2_ros::Buffer buffer;
 ros::Publisher pub;
@@ -107,7 +108,7 @@ void cloudFilter(pcl::PointXYZ* d_points, int num_points, float dx, float dy, fl
 }
 
 void cloud_cbk(const sensor_msgs::PointCloud2 msg)
-{  
+{   TIC
     sensor_msgs::PointCloud2 cloud;
     pcl::PointCloud<pcl::PointXYZ> lidarCloud;
     pcl::PointCloud<pcl::PointXYZ> pclCloud;
@@ -123,7 +124,7 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
     pcl::PointXYZ* cloud_data = lidarCloud.points.data();
 
     try
-    {
+    {   
         geometry_msgs::TransformStamped transformStamped = buffer.lookupTransform("odom", "pcd_frame", ros::Time(0));
 
         float dx = transformStamped.transform.translation.x;
@@ -165,10 +166,20 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
         THREAD_PROCESS_MASTER.join();
         THRED_PROCESS_EDGE.join();
 
+        pclCloud.points.erase(
+            std::remove_if(pclCloud.points.begin(), pclCloud.points.end(), [](const pcl::PointXYZ& pt) {
+                return std::isnan(pt.x) || std::isnan(pt.y) || std::isnan(pt.z);
+            }),
+            pclCloud.points.end()
+        );
+
+        pclCloud.width = pclCloud.points.size();
+
         pcl::toROSMsg(pclCloud, cloud);
         cloud.header.frame_id = "odom";
         pub.publish(cloud);
-        ROS_INFO("pclCloud size: %lu", pclCloud.points.size());
+        TOC
+        ROS_INFO("pclCloud size: %lu, raw size: %lu", pclCloud.points.size(), num_total);
     }
     catch (tf2::TransformException &ex){
         ROS_WARN("Could not get transform: %s", ex.what());

@@ -9,7 +9,7 @@
         <param name="self_half_height" value="0.257525"/>
         <param name="self_half_width" value="0.257525"/>
         <param name="passthrough_z_max" value="2.0"/>
-        <param name="passthrough_z_min" value="-0.3"/>
+        <param name="passthrough_z_min" value="-0.25"/>
     </node>
 
 </launch>

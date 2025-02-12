@@ -1,6 +1,8 @@
 #ifndef TICTOC_HPP
 #define TICTOC_HPP
 
+#define WITH_TICTOC
+
 #ifdef WITH_TICTOC
 
 #include <sys/time.h>
