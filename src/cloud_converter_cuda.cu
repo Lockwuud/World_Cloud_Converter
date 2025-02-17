@@ -238,6 +238,7 @@ int main(int argc, char *argv[])
     edgeCloud = generateRectanglePointCloud(ed_left, ed_right, ed_floor, ed_ceil, ed_resolution);
 
     pub = nh.advertise<sensor_msgs::PointCloud2>("/cloud_transformed", 10);
+    pub_without_edge = nh.advertise<sensor_msgs::PointCloud2>("/cloud_withoutedge", 10);
     ros::Subscriber sub = nh.subscribe("/livox/lidar", 1, cloud_cbk);
 
     ros::MultiThreadedSpinner spinner(2);
