@@ -39,9 +39,14 @@
 
 #include "tictoc.hpp"
 
+
 tf2_ros::Buffer buffer;
+
 ros::Publisher pub;
+ros::Publisher pub_without_edge;
+
 pcl::PointCloud<pcl::PointXYZ> edgeCloud;
+
 float ed_left, ed_right, ed_ceil, ed_floor, ed_resolution, self_half_height, self_half_width, passthrough_z_max, passthrough_z_min;
 
 
@@ -110,12 +115,14 @@ void cloudFilter(pcl::PointXYZ* d_points, int num_points, float dx, float dy, fl
 void cloud_cbk(const sensor_msgs::PointCloud2 msg)
 {   TIC
     sensor_msgs::PointCloud2 cloud;
+    sensor_msgs::PointCloud2 cloud_whithout_edge;
     pcl::PointCloud<pcl::PointXYZ> lidarCloud;
     pcl::PointCloud<pcl::PointXYZ> pclCloud;
     pcl::fromROSMsg(msg, lidarCloud);
 
     size_t num_points = lidarCloud.points.size();
     size_t num_edpoints = edgeCloud.points.size();
+    size_t num_without_edge;
     size_t num_total = num_edpoints + num_points;
     pclCloud.width = num_total;
     pclCloud.height = 1;
@@ -133,6 +140,7 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
 
         pcl::PointXYZ* d_points;
 
+        // 处理主体点云
         std::thread THREAD_PROCESS_MASTER([&]
         {
             cudaMalloc(&d_points, num_points * sizeof(pcl::PointXYZ));
@@ -155,6 +163,7 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
             cudaFree(d_points);
         });
 
+        // 处理边缘点云
         std::thread THRED_PROCESS_EDGE([&]
         {
             for (size_t j = 0; j < edgeCloud.points.size(); j++)
@@ -166,6 +175,28 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
         THREAD_PROCESS_MASTER.join();
         THRED_PROCESS_EDGE.join();
 
+        // 发布无边缘点云
+        std::thread THREAD_PUBLISH_WITHOUT_EDGE([&]
+        {
+            pcl::PointCloud<pcl::PointXYZ> pclCloudWithoutEdge;
+            pclCloudWithoutEdge.points.assign(pclCloud.points.begin(), pclCloud.points.begin() + num_points);
+
+            pclCloudWithoutEdge.points.erase(
+            std::remove_if(pclCloudWithoutEdge.points.begin(), pclCloudWithoutEdge.points.end(), [](const pcl::PointXYZ& pt) {
+                return std::isnan(pt.x) || std::isnan(pt.y) || std::isnan(pt.z);
+            }),
+            pclCloudWithoutEdge.points.end()
+            );
+
+            pclCloudWithoutEdge.width = pclCloudWithoutEdge.points.size();
+            num_without_edge = pclCloudWithoutEdge.width;
+
+            pcl::toROSMsg(pclCloudWithoutEdge, cloud_whithout_edge);
+            cloud_whithout_edge.header.frame_id = "odom";
+            pub_without_edge.publish(cloud_whithout_edge);
+        });
+
+        // 清除无效点
         pclCloud.points.erase(
             std::remove_if(pclCloud.points.begin(), pclCloud.points.end(), [](const pcl::PointXYZ& pt) {
                 return std::isnan(pt.x) || std::isnan(pt.y) || std::isnan(pt.z);
@@ -173,13 +204,15 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
             pclCloud.points.end()
         );
 
+        // 发布完整点云
         pclCloud.width = pclCloud.points.size();
-
         pcl::toROSMsg(pclCloud, cloud);
         cloud.header.frame_id = "odom";
         pub.publish(cloud);
         TOC
-        ROS_INFO("pclCloud size: %lu, raw size: %lu", pclCloud.points.size(), num_total);
+        ROS_INFO("pclCloud size: %lu, raw size: %lu, without edge size: %lu", pclCloud.points.size(), num_total, num_without_edge);
+
+        THREAD_PUBLISH_WITHOUT_EDGE.join();
     }
     catch (tf2::TransformException &ex){
         ROS_WARN("Could not get transform: %s", ex.what());
