@@ -1,11 +1,12 @@
-/*
- * @Author: hejia 2736463842@qq.com
- * @Date: 2025-01-19 22:39:05
- * @LastEditors: hejia 2736463842@qq.com
- * @LastEditTime: 2025-02-02 22:09:34
- * @FilePath: /ego-planner-swarm/src/World_Cloud_Converter/src/cloud_converter.cpp
- * @Description: Convert PointCloud coordinates using TF
- */
+/**
+ * @FilePath     : /src/World_Cloud_Converter/src/cloud_converter_r1.cpp
+ * @Description  :  
+ * @Author       : hejia 2736463842@qq.com
+ * @Version      : 0.0.1
+ * @LastEditors  : hejia 2736463842@qq.com
+ * @LastEditTime : 2025-02-20 16:54:05
+ * @Copyright    : G AUTOMOBILE RESEARCH INSTITUTE CO.,LTD Copyright (c) 2025.
+**/
 
 #include <thread>
 
@@ -33,16 +34,16 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/sync_policies/exact_time.h>
 
-float ed_left, ed_right, ed_ceil, ed_floor, ed_resolution, self_h, self_w;
-
 #define quarter_pi 0.785398163397f
-#define three_quarters_pi 2.356194490191f
-
-tf2_ros::Buffer buffer;
-ros::Publisher pub;
-pcl::PointCloud<pcl::PointXYZ> edgeCloud;
 
 using namespace message_filters;
+
+float ed_left, ed_right, ed_ceil, ed_floor, ed_resolution, self_h, self_w, range;
+
+tf2_ros::Buffer buffer;                     // tf转换
+ros::Publisher pub;                         // 发布处理后的点云
+pcl::PointCloud<pcl::PointXYZ> edgeCloud;   // 边界点云
+
 
 pcl::PointCloud<pcl::PointXYZ> generateRectanglePointCloud(float edge_left, float edge_right, float edge_floor, float edge_ceil, float resolution)
 {
@@ -113,7 +114,7 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                 pclCloud.points[i].x = x_local_angled + self_h;
                 pclCloud.points[i].y = y_local_angled - self_w;
 
-                if (fabs(pclCloud.points[i].x) <= self_h && fabs(pclCloud.points[i].y) <= self_w)
+                if (fabs(pclCloud.points[i].x) <= range && fabs(pclCloud.points[i].y) <= range)
                 {
                     pclCloud.points[i].x = std::nanf("");
                     pclCloud.points[i].y = std::nanf("");
@@ -154,7 +155,7 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                 pclCloud.points[j].x = x_local_angled + self_h;
                 pclCloud.points[j].y = y_local_angled + self_w;
 
-                if (pclCloud.points[i].x <= self_h && fabs(pclCloud.points[i].y) <= self_w)
+                if (fabsf(pclCloud.points[i].x) <= range && fabs(pclCloud.points[i].y) <= range)
                 {
                     pclCloud.points[j].x = std::nanf("");
                     pclCloud.points[j].y = std::nanf("");
@@ -208,18 +209,19 @@ int main(int argc, char *argv[])
     ros::param::get("ed_resolution", ed_resolution);
     ros::param::get("self_half_height", self_h);
     ros::param::get("self_half_width", self_w);
+    ros::param::get("range", range);
 
     tf2_ros::TransformListener listener(buffer);
     edgeCloud = generateRectanglePointCloud(ed_left, ed_right, ed_floor, ed_ceil, ed_resolution);
 
     // Subscriber and Publisher
     pub = nh.advertise<sensor_msgs::PointCloud2>("/cloud_transformed", 10);
-    message_filters::Subscriber<sensor_msgs::PointCloud> front_sub(nh, "/cloud_right", 1);
-    message_filters::Subscriber<sensor_msgs::PointCloud> rear_sub(nh, "/cloud_left", 1);
+    message_filters::Subscriber<sensor_msgs::PointCloud> right_sub(nh, "/cloud_right", 1);
+    message_filters::Subscriber<sensor_msgs::PointCloud> left_sub(nh, "/cloud_left", 1);
 
     // Time Sync
     typedef sync_policies::ApproximateTime<sensor_msgs::PointCloud, sensor_msgs::PointCloud> MySyncPolicy;
-    Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), front_sub, rear_sub); // queue size=10
+    Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), right_sub, left_sub); // queue size=10
     sync.registerCallback(boost::bind(&cloud_cbk, _1, _2));
 
     // Asynchronous Callback

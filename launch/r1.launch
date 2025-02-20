@@ -8,6 +8,7 @@
         <param name="ed_resolution" value="0.2"/>
         <param name="self_half_height" value="0.2825"/>
         <param name="self_half_width" value="0.2825"/>
+        <param name="range" value="0.2825"/>
     </node>
 
 </launch>

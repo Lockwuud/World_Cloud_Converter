@@ -68,13 +68,27 @@ set(THIRD_PARTY
 ## Add definitions for PCL
 add_definitions(${PCL_DEFINITIONS})
 
-## 时间软同步
-add_executable(${PROJECT_NAME}_node
-  src/cloud_converter.cpp
+
+
+## 时间软同步——r1
+add_executable(cloud_converter_r1
+  src/cloud_converter_r1.cpp
 )
-target_link_libraries(${PROJECT_NAME}_node
+target_link_libraries(cloud_converter_r1
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  ${Eigen3_LIBRARIES}
+  ${PCL_LIBRARIES}  # 链接 PCL 的库
+)
+
+## 时间软同步——r2
+add_executable(cloud_converter_r2
+  src/cloud_converter_r2.cpp
+)
+target_link_libraries(cloud_converter_r2
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Eigen3_LIBRARIES}
   ${PCL_LIBRARIES}  # 链接 PCL 的库
 )
 
