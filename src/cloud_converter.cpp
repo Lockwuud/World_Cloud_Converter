@@ -33,17 +33,10 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/sync_policies/exact_time.h>
 
-#define self_w 0.3155f
-#define self_h 0.3055f
-#define ed_left 3.6845f
-#define ed_right -0.3155f
-#define ed_ceil 14.6945f
-#define ed_floor -0.3055f
-#define ed_resolution 0.2f
+float ed_left, ed_right, ed_ceil, ed_floor, ed_resolution, self_h, self_w;
+
 #define quarter_pi 0.785398163397f
 #define three_quarters_pi 2.356194490191f
-#define half_length 0.257525f
-
 
 tf2_ros::Buffer buffer;
 ros::Publisher pub;
@@ -109,7 +102,7 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
         float dy = transformStamped.transform.translation.y;
         float dyaw = transformStamped.transform.translation.z;
 
-        std::thread THREAD_PROCESS_FRONT([&]
+        std::thread THREAD_PROCESS_RIGHT([&]
                                          {
             float dyaw_ = dyaw - quarter_pi;
             for (size_t i = 0; i < num_fpoints; i++)
@@ -117,8 +110,8 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                 float x_local_angled = msg_f->points[i].x * cos(dyaw_) - msg_f->points[i].y * sin(dyaw_);
                 float y_local_angled = msg_f->points[i].x * sin(dyaw_) + msg_f->points[i].y * cos(dyaw_);
 
-                pclCloud.points[i].x = x_local_angled + half_length;
-                pclCloud.points[i].y = y_local_angled - half_length;
+                pclCloud.points[i].x = x_local_angled + self_h;
+                pclCloud.points[i].y = y_local_angled - self_w;
 
                 if (fabs(pclCloud.points[i].x) <= self_h && fabs(pclCloud.points[i].y) <= self_w)
                 {
@@ -141,9 +134,9 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                 }               
             } });
 
-        std::thread THREAD_PROCESS_REAR([&]
+        std::thread THREAD_PROCESS_LEFT([&]
                                         {
-            float dyaw_ = dyaw + three_quarters_pi;
+            float dyaw_ = dyaw + quarter_pi;
             for (size_t i = 0; i < num_rpoints; i++)
             {
                 size_t j = i + num_fpoints;
@@ -158,8 +151,8 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
                     continue;
                 }
 
-                pclCloud.points[j].x = x_local_angled - half_length;
-                pclCloud.points[j].y = y_local_angled + half_length;
+                pclCloud.points[j].x = x_local_angled + self_h;
+                pclCloud.points[j].y = y_local_angled + self_w;
 
                 if (pclCloud.points[i].x <= self_h && fabs(pclCloud.points[i].y) <= self_w)
                 {
@@ -183,15 +176,15 @@ void cloud_cbk(const sensor_msgs::PointCloud::ConstPtr &msg_f, const sensor_msgs
             } });
 
         std::thread THRED_PROCESS_EDGE([&]
-                                       {
-                                           for (size_t j = 0; j < edgeCloud.points.size(); j++)
-                                           {
-                                               pclCloud.points[num_fpoints + num_rpoints + j] = edgeCloud.points[j];
-                                           }
-                                       });
+            {
+                for (size_t j = 0; j < edgeCloud.points.size(); j++)
+                {
+                    pclCloud.points[num_fpoints + num_rpoints + j] = edgeCloud.points[j];
+                }
+            });
 
-        THREAD_PROCESS_FRONT.join();
-        THREAD_PROCESS_REAR.join();
+        THREAD_PROCESS_RIGHT.join();
+        THREAD_PROCESS_LEFT.join();
         THRED_PROCESS_EDGE.join();
 
         pcl::toROSMsg(pclCloud, cloud);
@@ -208,13 +201,21 @@ int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "cloud_converter");
     ros::NodeHandle nh;
+    ros::param::get("ed_left", ed_left);
+    ros::param::get("ed_right", ed_right);
+    ros::param::get("ed_ceil", ed_ceil);
+    ros::param::get("ed_floor", ed_floor);
+    ros::param::get("ed_resolution", ed_resolution);
+    ros::param::get("self_half_height", self_h);
+    ros::param::get("self_half_width", self_w);
+
     tf2_ros::TransformListener listener(buffer);
     edgeCloud = generateRectanglePointCloud(ed_left, ed_right, ed_floor, ed_ceil, ed_resolution);
 
     // Subscriber and Publisher
     pub = nh.advertise<sensor_msgs::PointCloud2>("/cloud_transformed", 10);
-    message_filters::Subscriber<sensor_msgs::PointCloud> front_sub(nh, "/cloud_front", 1);
-    message_filters::Subscriber<sensor_msgs::PointCloud> rear_sub(nh, "/cloud_rear", 1);
+    message_filters::Subscriber<sensor_msgs::PointCloud> front_sub(nh, "/cloud_right", 1);
+    message_filters::Subscriber<sensor_msgs::PointCloud> rear_sub(nh, "/cloud_left", 1);
 
     // Time Sync
     typedef sync_policies::ApproximateTime<sensor_msgs::PointCloud, sensor_msgs::PointCloud> MySyncPolicy;

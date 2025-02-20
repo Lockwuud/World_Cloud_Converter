@@ -1,0 +1,13 @@
+<launch>
+
+    <node pkg="world_cloud_converter" type="cloud_converter_cuda_node" name="" output="screen">
+        <param name="ed_left" value="7.7175"/>
+        <param name="ed_right" value="-0.2825"/>
+        <param name="ed_ceil" value="14.7175"/>
+        <param name="ed_floor" value="-0.2825"/>
+        <param name="ed_resolution" value="0.2"/>
+        <param name="self_half_height" value="0.2825"/>
+        <param name="self_half_width" value="0.2825"/>
+    </node>
+
+</launch>

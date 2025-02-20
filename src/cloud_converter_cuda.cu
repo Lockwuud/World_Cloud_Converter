@@ -49,6 +49,7 @@ pcl::PointCloud<pcl::PointXYZ> edgeCloud;
 
 float ed_left, ed_right, ed_ceil, ed_floor, ed_resolution, self_half_height, self_half_width, passthrough_z_max, passthrough_z_min;
 
+bool en_passthrough_z = false;
 
 pcl::PointCloud<pcl::PointXYZ> generateRectanglePointCloud(float edge_left, float edge_right, float edge_floor, float edge_ceil, float resolution)
 {
@@ -234,6 +235,7 @@ int main(int argc, char *argv[])
     ros::param::get("self_half_width", self_half_width);
     ros::param::get("passthrough_z_max", passthrough_z_max);
     ros::param::get("passthrough_z_min", passthrough_z_min);
+    ros::param::get("en_passthrough_z", en_passthrough_z);
 
     edgeCloud = generateRectanglePointCloud(ed_left, ed_right, ed_floor, ed_ceil, ed_resolution);
 
