@@ -1,16 +1,25 @@
 <launch>
 
     <node pkg="world_cloud_converter" type="cloud_converter_cuda_node" name="" output="screen">
-        <param name="ed_left" value="7.63276"/>
-        <param name="ed_right" value="-0.36724"/>
-        <param name="ed_ceil" value="14.63276"/>
-        <param name="ed_floor" value="-0.36724"/>
-        <param name="ed_resolution" value="0.2"/>
-        <param name="self_half_height" value="0.22908"/>
-        <param name="self_half_width" value="0.11106"/>
-        <param name="self_half_height_back" value="0.22774"/>
-        <param name="self_half_width_back" value="0.0"/>
-        <param name="range" value="0.8"/>
+        <param name="ed_left" value="7.63276"/>             <!-- 左侧边界 -->
+        <param name="ed_right" value="-0.36724"/>           <!-- 右侧边界 -->
+        <param name="ed_ceil" value="14.63276"/>            <!-- 顶部边界 -->
+        <param name="ed_floor" value="-0.36724"/>           <!-- 底部边界 -->
+        <param name="ed_resolution" value="0.2"/>           <!-- 网格分辨率 -->
+        <param name="yaw_1" value="0.0" />                  <!-- 1号雷达坐标系与车体坐标系的偏差 -->
+        <param name="yaw_2" value="0.0" />                  <!-- 2号雷达坐标系与车体坐标系的偏差 -->
+        <param name="yaw_3" value="0.0" />                  <!-- 3号雷达坐标系与车体坐标系的偏差 -->
+        <param name="dist1_x" value="1.0" />                <!-- 1号雷达在车体坐标系下的坐标 -->
+        <param name="dist1_y" value="0.0" />
+        <param name="dist2_x" value="-1.0" />               <!-- 2号雷达在车体坐标系下的坐标 -->
+        <param name="dist2_y" value="0.0" />
+        <param name="dist3_x" value="0.0" />                <!-- 3号雷达在车体坐标系下的坐标 -->
+        <param name="dist3_y" value="-1.0" />
+        <param name="half_height" value="1.0" />            <!-- 车体高度的一半 -->
+        <param name="half_width" value="0.5" />             <!-- 车体宽度的一半 -->
+        <param name="cloud_topic_1" value="/cloud_right" /> <!-- 1号雷达的点云话题 -->
+        <param name="cloud_topic_2" value="/cloud_left" />  <!-- 2号雷达的点云话题 -->
+        <param name="cloud_topic_3" value="/cloud_back" />  <!-- 3号雷达的点云话题 -->
     </node>
 
 </launch>
