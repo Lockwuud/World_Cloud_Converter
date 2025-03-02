@@ -190,6 +190,7 @@ void cloud_cbk(const sensor_msgs::PointCloud2 msg)
             );
 
             pclCloudWithoutEdge.width = pclCloudWithoutEdge.points.size();
+            pclCloudWithoutEdge.height = 1;
             num_without_edge = pclCloudWithoutEdge.width;
 
             pcl::toROSMsg(pclCloudWithoutEdge, cloud_whithout_edge);
