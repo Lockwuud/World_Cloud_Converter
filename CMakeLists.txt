@@ -26,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   quadrotor_msgs
   message_generation
+  livox_ros_driver
 )
 
 find_package(CUDA REQUIRED)
@@ -101,3 +102,11 @@ target_link_libraries(cloud_converter_cuda_node
   ${CUDA_LIBRARIES}
 )
 
+## 时间软同步——CUDA并行——r1
+cuda_add_executable(cloud_converter_cuda_r1 src/cloud_converter_cuda_r1.cu)
+target_link_libraries(cloud_converter_cuda_r1
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES}  
+  ${CUDA_LIBRARIES}
+)
