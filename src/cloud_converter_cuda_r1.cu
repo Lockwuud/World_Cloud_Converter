@@ -4,7 +4,7 @@
  * @Author       : hejia 2736463842@qq.com
  * @Version      : 0.0.1
  * @LastEditors  : hejia 2736463842@qq.com
- * @LastEditTime : 2025-03-08 19:22:12
+ * @LastEditTime : 2025-03-09 16:14:06
  * Copyright    : G AUTOMOBILE RESEARCH INSTITUTE CO.,LTD Copyright (c) 2025.
  */
 
@@ -79,63 +79,33 @@ void initParameters(void)
 }
 
 __global__ 
-void cloudFilter(livox_ros_driver::CustomPoint* points_1, livox_ros_driver::CustomPoint* points_2, size_t num_points_1, float left, float right, float floor, float ceil, float z_max, float z_min, float dyaw, float dx, float dy, float self_half_height, float self_half_width)
+void cloudFilter(livox_ros_driver::CustomPoint* points, size_t num_points, float left, float right, float floor, float ceil, float z_max, float z_min, float dyaw, float dx, float dy, float self_half_height, float self_half_width)
 {
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     float x_local, y_local, z_local;
 
-    if (idx <= num_points_1)
+    x_local = points[idx].x;
+    y_local = points[idx].y;
+    z_local = points[idx].z;
+
+    if(fabsf(x_local) < self_half_height && fabsf(y_local) < self_half_width || z_local < z_min || z_local > z_max)
     {
-        x_local = points_1[idx].x;
-        y_local = points_1[idx].y;
-        z_local = points_1[idx].z;
-
-        if(fabsf(x_local) < self_half_height && fabsf(y_local) < self_half_width || z_local < z_min || z_local > z_max)
-        {
-            points_1[idx].x = std::nanf("");
-            points_1[idx].y = std::nanf("");
-            points_1[idx].z = std::nanf("");
-            return;
-        }
-
-        points_1[idx].x = x_local * cos(dyaw) - y_local * sin(dyaw) + dx;
-        points_1[idx].y = x_local * sin(dyaw) + y_local * cos(dyaw) + dy;
-        points_1[idx].z = 0.0f;
-
-        if(points_1[idx].x <= floor || points_1[idx].x >= ceil || points_1[idx].y <= right || points_1[idx].y >= left)
-        {
-            points_1[idx].x = std::nanf("");
-            points_1[idx].y = std::nanf("");
-            points_1[idx].z = std::nanf("");
-            return;
-        }
+        points[idx].x = std::nanf("");
+        points[idx].y = std::nanf("");
+        points[idx].z = std::nanf("");
+        return;
     }
-    else
+
+    points[idx].x = x_local * cos(dyaw) - y_local * sin(dyaw) + dx;
+    points[idx].y = x_local * sin(dyaw) + y_local * cos(dyaw) + dy;
+    points[idx].z = 0.0f;
+
+    if(points[idx].x <= floor || points[idx].x >= ceil || points[idx].y <= right || points[idx].y >= left)
     {
-        idx  = idx % num_points_1;
-        x_local = points_2[idx].x;
-        y_local = points_2[idx].y;
-        z_local = points_2[idx].z;
-
-        if(fabsf(x_local) < self_half_height && fabsf(y_local) < self_half_width || z_local < z_min || z_local > z_max)
-        {
-            points_2[idx].x = std::nanf("");
-            points_2[idx].y = std::nanf("");
-            points_2[idx].z = std::nanf("");
-            return;
-        }
-
-        points_2[idx].x = x_local * cos(dyaw) - y_local * sin(dyaw) + dx;
-        points_2[idx].y = x_local * sin(dyaw) + y_local * cos(dyaw) + dy;
-        points_2[idx].z = 0.0f;
-
-        if(points_2[idx].x <= floor || points_2[idx].x >= ceil || points_2[idx].y <= right || points_2[idx].y >= left)
-        {
-            points_2[idx].x = std::nanf("");
-            points_2[idx].y = std::nanf("");
-            points_2[idx].z = std::nanf("");
-            return;
-        }
+        points[idx].x = std::nanf("");
+        points[idx].y = std::nanf("");
+        points[idx].z = std::nanf("");
+        return;
     }
 }
     
@@ -154,8 +124,8 @@ void livox_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg_1, const livox_r
     pclCloud.height = 1;
     pclCloud.points.resize(num_total);
 
-    std::vector<livox_ros_driver::CustomPoint> points_1 = msg_1->points;
-    std::vector<livox_ros_driver::CustomPoint> points_2 = msg_2->points;
+    std::vector<livox_ros_driver::CustomPoint> points = msg_1->points;
+    points.insert(points.end(), msg_2->points.begin(), msg_2->points.end());
 
     try{
         geometry_msgs::TransformStamped transformStamped = buffer.lookupTransform("odom", "pcd_frame", ros::Time(0));
@@ -167,17 +137,14 @@ void livox_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg_1, const livox_r
         // 处理主体点云
         std::thread THREAD_PROCESS_MASTER([&]
         {
-            livox_ros_driver::CustomPoint* d_points_1;
-            livox_ros_driver::CustomPoint* d_points_2;
+            livox_ros_driver::CustomPoint* d_points;
             
-            cudaMalloc(&d_points_1, num_points_1 * sizeof(livox_ros_driver::CustomPoint));
-            cudaMemcpy(d_points_1, points_1.data(), num_points_1 * sizeof(livox_ros_driver::CustomPoint), cudaMemcpyHostToDevice);
-            cudaMalloc(&d_points_2, num_points_2 * sizeof(livox_ros_driver::CustomPoint));
-            cudaMemcpy(d_points_2, points_2.data(), num_points_2 * sizeof(livox_ros_driver::CustomPoint), cudaMemcpyHostToDevice);
+            cudaMalloc(&d_points, num_without_edge * sizeof(livox_ros_driver::CustomPoint));
+            cudaMemcpy(d_points, points.data(), num_without_edge * sizeof(livox_ros_driver::CustomPoint), cudaMemcpyHostToDevice);
     
             int blockSize = 256;
             int numBlocks = (num_without_edge + blockSize - 1) / blockSize;
-            cloudFilter<<<numBlocks, blockSize>>>(d_points_1, d_points_2, num_points_1, ed_left, ed_right, ed_floor, ed_ceil, passthrough_z_max, passthrough_z_min, dyaw, dx, dy, half_height, half_width);
+            cloudFilter<<<numBlocks, blockSize>>>(d_points, num_without_edge, ed_left, ed_right, ed_floor, ed_ceil, passthrough_z_max, passthrough_z_min, dyaw, dx, dy, half_height, half_width);
     
             printf("half_height:%f\n", half_height);
             printf("half_width:%f\n", half_width);
@@ -188,10 +155,8 @@ void livox_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg_1, const livox_r
             printf("max_z:%f\n", passthrough_z_max); 
             printf("min_z:%f\n", passthrough_z_min); 
     
-            cudaMemcpy(pclCloud.points.data(), d_points_1, num_points_1 * sizeof(livox_ros_driver::CustomPoint), cudaMemcpyDeviceToHost);
-            cudaFree(d_points_1);
-            cudaMemcpy(pclCloud.points.data() + num_points_1, d_points_2, num_points_2 * sizeof(livox_ros_driver::CustomPoint), cudaMemcpyDeviceToHost);
-            cudaFree(d_points_2);
+            cudaMemcpy(pclCloud.points.data(), d_points, num_without_edge * sizeof(livox_ros_driver::CustomPoint), cudaMemcpyDeviceToHost);
+            cudaFree(d_points);
         });
 
         // 处理边缘点云
