@@ -6,9 +6,11 @@
         <param name="ed_ceil" value="14.7175"/>
         <param name="ed_floor" value="-0.2825"/>
         <param name="ed_resolution" value="0.2"/>
-        <param name="half_height" value="-0.25"/>
-        <param name="half_width" value="-0.25"/>
-        <param name="cloud_topic_1" value="/livox/lidar_192_168_1_3"/>
+        <param name="half_height" value="0.25"/>
+        <param name="half_width" value="0.25"/>
+        <param name="passthrough_z_max" value="1.4"/>
+        <param name="passthrough_z_min" value="-0.2"/>
+        <param name="cloud_topic_1" value="/livox/lidar_192_168_1_126"/>
         <param name="cloud_topic_2" value="/livox/lidar_192_168_1_115"/>
     </node>
 

@@ -24,7 +24,6 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   geometry_msgs
-  quadrotor_msgs
   message_generation
   livox_ros_driver
 )
