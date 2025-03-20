@@ -115,6 +115,7 @@ void livox_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg_1, const livox_r
     sensor_msgs::PointCloud2 cloud;                 // 转换后的雷达点云
     sensor_msgs::PointCloud2 cloud_whithout_edge;   // 去除边界后的雷达点云
     pcl::PointCloud<pcl::PointXYZ> pclCloud;        
+    float time_lidar = msg_1->header.stamp.toSec();
 
     size_t num_points_1 = msg_1->point_num;
     size_t num_points_2 = msg_2->point_num;
@@ -133,7 +134,15 @@ void livox_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg_1, const livox_r
 
         float dx = transformStamped.transform.translation.x;
         float dy = transformStamped.transform.translation.y;
-        float dyaw = transformStamped.transform.translation.z;
+        float time_odom = transformStamped.header.stamp.toSec();
+        float belta = transformStamped.transform.translation.z;
+        
+        double roll, pitch, yaw_;
+        tf::Quaternion quat;                                  
+        tf::quaternionMsgToTF(transformStamped.transform.rotation, quat); 
+        tf::Matrix3x3(quat).getRPY(roll, pitch, yaw_);
+
+        float dyaw = float(yaw_) + belta * (time_odom - time_lidar);
 
         // 处理主体点云
         std::thread THREAD_PROCESS_MASTER([&]
